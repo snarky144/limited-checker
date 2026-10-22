@@ -1,7 +1,7 @@
 {
   "min_price_usd": 20,
-  "test_email_id": "1",
-  "eldorado_enabled": true,
+  "test_email_id": "2",
+  "eldorado_enabled": false,
   "items": [
     {"name": "Frozen Horns of the Frigid Planes",    "max_usd": 1000},
     {"name": "Poisoned Horns of the Toxic Wasteland","max_usd": 1000},
