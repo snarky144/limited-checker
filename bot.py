@@ -1,5 +1,5 @@
-"""Listing watcher: checks Gameflip and Eldorado for specific items under a price
-limit and emails you. Alert-only: it never buys anything.
+"""Listing watcher: checks Gameflip (and optionally Eldorado) for specific items
+under a price limit and emails you. Alert-only: it never buys anything.
 
 Env vars (set as GitHub Actions secrets):
   EMAIL_USER          Gmail address used to send
@@ -45,6 +45,8 @@ def norm(s):
 
 
 def match_item(title, items):
+    """Match on the FULL item name, so lookalikes such as
+    'Frozen Horns of the Dangerous One' don't count."""
     t = norm(title)
     for it in items:
         if norm(it["name"]) in t:
@@ -123,20 +125,38 @@ def fetch_eldorado(cfg, item):
 
 # ---------------------------------------------------------------- email
 def send_email(subject, body):
-    user = os.environ.get("EMAIL_USER")
-    pw = os.environ.get("EMAIL_APP_PASSWORD")
-    to = os.environ.get("EMAIL_TO", user)
+    """Returns True if the email was sent. Tries SSL (465), then STARTTLS (587)."""
+    user = (os.environ.get("EMAIL_USER") or "").strip()
+    # app passwords are shown with spaces; remove ALL whitespace (incl. non-breaking)
+    pw = "".join((os.environ.get("EMAIL_APP_PASSWORD") or "").split())
+    to = (os.environ.get("EMAIL_TO") or user).strip()
     if not (user and pw):
-        print("Email secrets missing; would have sent:\n", subject, "\n", body)
-        return
+        print("Email secrets missing (EMAIL_USER / EMAIL_APP_PASSWORD).")
+        return False
+    print(f"Email: app password length = {len(pw)} (Google app passwords are 16)")
+
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = user
     msg["To"] = to
     msg.set_content(body)
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ssl.create_default_context()) as s:
-        s.login(user, pw)
-        s.send_message(msg)
+
+    ctx = ssl.create_default_context()
+    for label in ("ssl465", "starttls587"):
+        try:
+            if label == "ssl465":
+                s = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30, context=ctx)
+            else:
+                s = smtplib.SMTP("smtp.gmail.com", 587, timeout=30)
+                s.starttls(context=ctx)
+            with s:
+                s.login(user, pw)
+                s.send_message(msg)
+            print(f"Email sent via {label}.")
+            return True
+        except Exception as e:  # noqa: BLE001
+            print(f"Email attempt {label} failed: {type(e).__name__}: {e}")
+    return False
 
 
 # ---------------------------------------------------------------- main
@@ -148,8 +168,20 @@ def main():
     alerted = set(state.get("alerted", []))
     fails = state.get("fails", {})
 
-    sources = {"Gameflip": fetch_gameflip, "Eldorado": fetch_eldorado}
+    sources = {"Gameflip": fetch_gameflip}
+    if cfg.get("eldorado_enabled"):
+        sources["Eldorado"] = fetch_eldorado
     hits = []
+    pending = {}
+    email_failed = False
+
+    # One-off test email: change "test_email_id" in config.json to send another.
+    test_id = str(cfg.get("test_email_id", ""))
+    if test_id and state.get("test_email_id") != test_id:
+        if send_email("[Bot] Test email", "If you can read this, email alerts work."):
+            state["test_email_id"] = test_id
+        else:
+            email_failed = True
 
     for name, fn in sources.items():
         ok_any = False
@@ -160,6 +192,10 @@ def main():
             except Exception as e:  # noqa: BLE001
                 print(f"[{name}] {item['name']}: {e}")
                 continue
+            exact = [x["price"] for x in listings if norm(item["name"]) in norm(x["title"])]
+            cheapest = f"${min(exact):.2f}" if exact else "none"
+            print(f"[{name}] {item['name']}: {len(listings)} results, "
+                  f"{len(exact)} exact-name, cheapest exact-name: {cheapest}")
             for l in listings:
                 m = match_item(l["title"], cfg["items"])
                 if not m:
@@ -167,9 +203,10 @@ def main():
                 if not (cfg.get("min_price_usd", 0) <= l["price"] <= m["max_usd"]):
                     continue
                 key = f"{l['source']}:{l['id']}:{l['price']:.2f}"
-                if key in alerted:
+                if key in alerted or key in pending:
                     continue
-                alerted.add(key)
+                pending[key] = True
+                l["key"] = key
                 l["limit"] = m["max_usd"]
                 hits.append(l)
             time.sleep(1)  # be polite, avoid rate limits
@@ -194,13 +231,19 @@ def main():
             + "\n\nCheck the seller's reviews and history before paying. "
             "Prices far below market are often scams."
         )
-        send_email(f"[Bot] {len(hits)} deal(s): ${hits[0]['price']:.0f} {hits[0]['title']}", body)
+        subject = f"[Bot] {len(hits)} deal(s): ${hits[0]['price']:.0f} {hits[0]['title']}"
+        if send_email(subject, body):
+            alerted.update(h["key"] for h in hits)  # only remember them once sent
+        else:
+            email_failed = True  # not saved as alerted, so it retries next run
 
     state["alerted"] = sorted(alerted)[-2000:]
     state["fails"] = fails
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=1)
     print(f"Done. {len(hits)} new hit(s).")
+    if email_failed:
+        sys.exit("Email sending failed (see log above). Will retry next run.")
 
 
 if __name__ == "__main__":

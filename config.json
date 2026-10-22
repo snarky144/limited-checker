@@ -1,16 +1,18 @@
 {
-  "min_price_usd": 5,
+  "min_price_usd": 20,
+  "test_email_id": "1",
+  "eldorado_enabled": false,
   "items": [
-    {"name": "Frozen Horns",            "max_usd": 1000},
-    {"name": "Poisoned Horns",          "max_usd": 1000},
-    {"name": "Fiery Horns",             "max_usd": 1000},
-    {"name": "Valkyrie Helm",           "max_usd": 400},
-    {"name": "Silver King of the Night","max_usd": 400},
-    {"name": "Blue Queen of the Night", "max_usd": 400},
-    {"name": "Viridian Domino Crown",   "max_usd": 400},
-    {"name": "Black Iron Horns",        "max_usd": 300},
-    {"name": "Green Queen of the Night","max_usd": 300}
+    {"name": "Frozen Horns of the Frigid Planes",    "max_usd": 1000},
+    {"name": "Poisoned Horns of the Toxic Wasteland","max_usd": 1000},
+    {"name": "Fiery Horns of the Netherworld",       "max_usd": 1000},
+    {"name": "Valkyrie Helm",                        "max_usd": 400},
+    {"name": "Silver King of the Night",             "max_usd": 400},
+    {"name": "Blue Queen of the Night",              "max_usd": 400},
+    {"name": "Viridian Domino Crown",                "max_usd": 400},
+    {"name": "Black Iron Horns",                     "max_usd": 300},
+    {"name": "Green Queen of the Night",             "max_usd": 300}
   ],
-  "eldorado_search_url": "https://www.eldorado.gg/search?searchQuery={query}",
+  "eldorado_search_url": "PASTE_ELDORADO_SEARCH_URL_HERE_WITH_{query}_WHERE_THE_ITEM_NAME_GOES",
   "gameflip_api_url": "https://production-gameflip.fingershock.com/api/v1/listing"
 }
