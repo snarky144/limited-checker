@@ -1,0 +1,16 @@
+{
+  "min_price_usd": 5,
+  "items": [
+    {"name": "Frozen Horns",            "max_usd": 1000},
+    {"name": "Poisoned Horns",          "max_usd": 1000},
+    {"name": "Fiery Horns",             "max_usd": 1000},
+    {"name": "Valkyrie Helm",           "max_usd": 400},
+    {"name": "Silver King of the Night","max_usd": 400},
+    {"name": "Blue Queen of the Night", "max_usd": 400},
+    {"name": "Viridian Domino Crown",   "max_usd": 400},
+    {"name": "Black Iron Horns",        "max_usd": 300},
+    {"name": "Green Queen of the Night","max_usd": 300}
+  ],
+  "eldorado_search_url": "https://www.eldorado.gg/search?searchQuery={query}",
+  "gameflip_api_url": "https://production-gameflip.fingershock.com/api/v1/listing"
+}
