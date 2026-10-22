@@ -142,6 +142,9 @@ def fetch_eldorado(cfg, item):
             "price": p,
             "url": f"https://www.eldorado.gg/offer/{i}",
         } for i, t, p in found]
+    if not out:
+        title = soup.title.string.strip() if soup.title and soup.title.string else None
+        print(f"[Eldorado debug] HTTP {r.status_code}, {len(r.text)} bytes, page title: {title}")
     return out
 
 
@@ -163,22 +166,59 @@ def send_email(subject, body):
     msg["To"] = to
     msg.set_content(body)
 
+    print(f"Email: sender looks like an address: {'@' in user}, domain: {user.split('@')[-1]}")
+
     ctx = ssl.create_default_context()
     for label in ("ssl465", "starttls587"):
+        stage = "connect"
         try:
             if label == "ssl465":
                 s = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30, context=ctx)
             else:
                 s = smtplib.SMTP("smtp.gmail.com", 587, timeout=30)
+                stage = "starttls"
                 s.starttls(context=ctx)
             with s:
+                stage = "login"
                 s.login(user, pw)
+                stage = "send"
                 s.send_message(msg)
             print(f"Email sent via {label}.")
             return True
         except Exception as e:  # noqa: BLE001
-            print(f"Email attempt {label} failed: {type(e).__name__}: {e}")
+            print(f"Email attempt {label} failed at stage '{stage}': {type(e).__name__}: {e}")
     return False
+
+
+def send_ntfy(title, body):
+    """Optional phone push via ntfy.sh (free). Needs secret NTFY_TOPIC."""
+    topic = (os.environ.get("NTFY_TOPIC") or "").strip()
+    if not topic:
+        return False
+    try:
+        r = requests.post(
+            f"https://ntfy.sh/{topic}",
+            data=body.encode("utf-8")[:3500],
+            headers={
+                "Title": title.encode("ascii", "ignore").decode(),
+                "Priority": "high",
+                "Tags": "moneybag",
+            },
+            timeout=20,
+        )
+        r.raise_for_status()
+        print("Push (ntfy) sent.")
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"Push (ntfy) failed: {type(e).__name__}: {e}")
+        return False
+
+
+def notify(subject, body):
+    """Send via phone push and email; counts as sent if either worked."""
+    ok_push = send_ntfy(subject, body)
+    ok_mail = send_email(subject, body)
+    return ok_push or ok_mail
 
 
 # ---------------------------------------------------------------- main
@@ -200,7 +240,7 @@ def main():
     # One-off test email: change "test_email_id" in config.json to send another.
     test_id = str(cfg.get("test_email_id", ""))
     if test_id and state.get("test_email_id") != test_id:
-        if send_email("[Bot] Test email", "If you can read this, email alerts work."):
+        if notify("[Bot] Test alert", "If you can read this, alerts work."):
             state["test_email_id"] = test_id
         else:
             email_failed = True
@@ -235,7 +275,7 @@ def main():
 
         fails[name] = 0 if ok_any else fails.get(name, 0) + 1
         if fails[name] == FAIL_ALERT_AFTER:
-            send_email(
+            notify(
                 f"[Bot] {name} has been failing for ~1 hour",
                 f"{name} requests failed {FAIL_ALERT_AFTER} runs in a row. "
                 "It is probably blocking GitHub's servers or changed its site. "
@@ -254,7 +294,7 @@ def main():
             "Prices far below market are often scams."
         )
         subject = f"[Bot] {len(hits)} deal(s): ${hits[0]['price']:.0f} {hits[0]['title']}"
-        if send_email(subject, body):
+        if notify(subject, body):
             alerted.update(h["key"] for h in hits)  # only remember them once sent
         else:
             email_failed = True  # not saved as alerted, so it retries next run
@@ -265,7 +305,7 @@ def main():
         json.dump(state, f, indent=1)
     print(f"Done. {len(hits)} new hit(s).")
     if email_failed:
-        sys.exit("Email sending failed (see log above). Will retry next run.")
+        sys.exit("No alert channel worked (see log above). Will retry next run.")
 
 
 if __name__ == "__main__":
