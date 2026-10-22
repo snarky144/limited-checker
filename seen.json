@@ -1,0 +1,12 @@
+{
+ "alerted": [
+  "Gameflip:585087c1-8a17-425c-b848-55bffbc1b49a:78.90",
+  "Gameflip:b3ac78a2-0583-43e3-a94f-ffd6b8b2c6b3:300.00",
+  "Gameflip:bcab5a66-c4cc-4858-8c7d-a52eed0dda29:34.99"
+ ],
+ "fails": {
+  "Gameflip": 0,
+  "Eldorado": 0
+ },
+ "test_email_id": "1"
+}
