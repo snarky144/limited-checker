@@ -1,7 +1,7 @@
 {
   "min_price_usd": 20,
   "test_email_id": "1",
-  "eldorado_enabled": false,
+  "eldorado_enabled": true,
   "items": [
     {"name": "Frozen Horns of the Frigid Planes",    "max_usd": 1000},
     {"name": "Poisoned Horns of the Toxic Wasteland","max_usd": 1000},
@@ -13,6 +13,6 @@
     {"name": "Black Iron Horns",                     "max_usd": 300},
     {"name": "Green Queen of the Night",             "max_usd": 300}
   ],
-  "eldorado_search_url": "PASTE_ELDORADO_SEARCH_URL_HERE_WITH_{query}_WHERE_THE_ITEM_NAME_GOES",
+  "eldorado_search_url": "https://www.eldorado.gg/roblox-limiteds/i/206-2-0?searchQuery={query}",
   "gameflip_api_url": "https://production-gameflip.fingershock.com/api/v1/listing"
 }

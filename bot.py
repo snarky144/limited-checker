@@ -106,21 +106,43 @@ def fetch_eldorado(cfg, item):
     r = requests.get(url, headers=HEADERS, timeout=20)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
-    found = []
-    for s in soup.find_all("script"):
-        txt = (s.string or "").strip()
-        if txt.startswith("{") or txt.startswith("["):
-            try:
-                _walk(json.loads(txt), found)
-            except json.JSONDecodeError:
-                pass
-    return [{
-        "source": "Eldorado",
-        "id": i,
-        "title": t,
-        "price": p,
-        "url": f"https://www.eldorado.gg/offer/{i}",
-    } for i, t, p in found]
+    out, seen = [], set()
+
+    # 1) Listing cards: <a href=".../oi/<id>"> whose text holds title, seller and "$12.34"
+    for a in soup.find_all("a", href=re.compile(r"/oi/")):
+        href = a.get("href", "")
+        text = " ".join(a.get_text(" ", strip=True).split())
+        m = re.search(r"\$\s?([\d,]+(?:\.\d+)?)", text)
+        oid = href.rstrip("/").split("/")[-1]
+        if not m or oid in seen:
+            continue
+        seen.add(oid)
+        out.append({
+            "source": "Eldorado",
+            "id": oid,
+            "title": text,
+            "price": float(m.group(1).replace(",", "")),
+            "url": ("https://www.eldorado.gg" + href) if href.startswith("/") else href,
+        })
+
+    # 2) Fallback: listing data embedded as JSON in script tags
+    if not out:
+        found = []
+        for s in soup.find_all("script"):
+            txt = (s.string or "").strip()
+            if txt.startswith("{") or txt.startswith("["):
+                try:
+                    _walk(json.loads(txt), found)
+                except json.JSONDecodeError:
+                    pass
+        out = [{
+            "source": "Eldorado",
+            "id": i,
+            "title": t,
+            "price": p,
+            "url": f"https://www.eldorado.gg/offer/{i}",
+        } for i, t, p in found]
+    return out
 
 
 # ---------------------------------------------------------------- email
